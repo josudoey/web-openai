@@ -14,15 +14,22 @@ function RealtimeRTCButton() {
     const tokenResponse = await fetch('/api/session')
     const data = await tokenResponse.json()
     const EPHEMERAL_KEY = data.client_secret.value
+
     const peer = new RTCPeerConnection()
-    const audioEl = document.createElement('audio')
-    audioEl.autoplay = true
-    peer.ontrack = (e) => (audioEl.srcObject = e.streams[0])
-    const audioDevice = await navigator.mediaDevices.getUserMedia({
+    const remoteAudio = document.createElement('audio')
+    remoteAudio.autoplay = true
+    peer.ontrack = (e) => {
+      const [remoteStream] = e.streams
+      remoteAudio.srcObject = remoteStream
+    }
+
+    const localStream = await navigator.mediaDevices.getUserMedia({
       audio: true
     })
-    mediaStreamRef.current = audioDevice
-    peer.addTrack(audioDevice.getTracks()[0])
+    mediaStreamRef.current = localStream
+    localStream.getTracks().forEach((track) => {
+      peer.addTrack(track, localStream)
+    })
     const channel = peer.createDataChannel('oai-events')
     channel.addEventListener('open', () => {
       setLoading(false)
@@ -33,7 +40,7 @@ function RealtimeRTCButton() {
       console.log(e)
     })
     channel.addEventListener('close', (e) => {
-      audioDevice.getTracks().forEach((track) => {
+      localStream.getTracks().forEach((track) => {
         track.stop()
       })
     })
